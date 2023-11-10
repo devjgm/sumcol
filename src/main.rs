@@ -1,6 +1,8 @@
 use clap::Parser;
+use env_logger::Env;
 use regex::Regex;
-use std::io::{self, BufRead};
+use std::fs;
+use std::io::{self, BufRead, BufReader};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -9,6 +11,7 @@ struct Args {
     #[arg(long, short, default_value("0"))]
     field: usize,
 
+    /// Treat all numbers as hex, not just those with a leading 0x.
     #[arg(long, short = 'x')]
     hex: bool,
 
@@ -16,44 +19,59 @@ struct Args {
     #[arg(long, short, default_value(r"\s+"))]
     delimiter: Regex,
 
-    /// Extra (unparsed) cargo args
+    /// Files to read input from, otherwise uses stdin.
     #[arg(trailing_var_arg = true)]
     pub files: Vec<String>,
 }
 
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
-pub type Result<T> = std::result::Result<T, Error>;
-
-fn main() -> Result<()> {
-    env_logger::init();
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
     let args = Args::parse();
     log::debug!("args={args:?}");
 
-    let mut sum = 0i128;
-    for (i, line) in io::stdin().lock().lines().enumerate() {
-        let line = line?.trim().to_string();
-        log::debug!("{i}: line={line:?}");
-        if line.is_empty() {
-            continue;
+    // Gets a list of input sources. Either the file(s) specified on the command line or stdin.
+    type Reader = Box<dyn BufRead>;
+    let readers: Vec<Reader> = if args.files.is_empty() {
+        vec![Box::new(BufReader::new(io::stdin()))]
+    } else {
+        let mut v: Vec<Reader> = vec![];
+        for f in args.files {
+            v.push(Box::new(BufReader::new(fs::File::open(f)?)));
         }
-        let col = match args.field {
-            0 => line.as_str(),
-            f => args.delimiter.split(&line).nth(f - 1).unwrap_or_default(),
-        };
-        let default_radix = if args.hex { 16 } else { 10 };
-        let (col, radix) = match col.strip_prefix("0x") {
-            Some(s) => (s, 16),
-            None => (col, default_radix),
-        };
-        let n = match i128::from_str_radix(col, radix) {
-            Ok(n) => n,
-            Err(e) => {
-                log::warn!("{e:?}, col={col:?}. Using 0 instead.");
-                0
+        v
+    };
+
+    let mut sum = 0i128;
+    for reader in readers {
+        for (i, line) in reader.lines().enumerate() {
+            let line = line?.trim().to_string();
+            log::debug!("{i}: line={line:?}");
+            if line.is_empty() {
+                continue;
             }
-        };
-        sum += n;
-        log::debug!("{i}: col={col:?}, n={n:?}, sum={sum:?}");
+            let col = match args.field {
+                0 => line.as_str(),
+                f => args.delimiter.split(&line).nth(f - 1).unwrap_or_default(),
+            };
+            let default_radix = if args.hex { 16 } else { 10 };
+            let (col, radix) = match col.strip_prefix("0x") {
+                Some(s) => (s, 16),
+                None => (col, default_radix),
+            };
+            let n = match i128::from_str_radix(col, radix) {
+                Ok(n) => n,
+                Err(e) => {
+                    log::info!("{e:?}, col={col:?}. Using 0 instead.");
+                    // If it parses as hex, warn the user that they may want to use -x.
+                    if i128::from_str_radix(col, 16).is_ok() {
+                        log::warn!("Failed to parse {col:?}. Consider using -x");
+                    }
+                    0
+                }
+            };
+            sum += n;
+            log::debug!("{i}: col={col:?}, n={n:?}, sum={sum:?}");
+        }
     }
 
     if args.hex {

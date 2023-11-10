@@ -37,7 +37,7 @@ fn simple_column_sum() -> TestResult {
     hello 2 foo
     ";
     cmd.write_stdin(input)
-        .args(["-f", "2"])
+        .args(["-f2"])
         // .env("RUST_LOG", "debug")
         .assert()
         .success()
@@ -54,7 +54,7 @@ fn sum_implicit_hex() -> TestResult {
     hello 0xB foo
     ";
     cmd.write_stdin(input)
-        .args(["-f", "2"])
+        .args(["-f2"])
         .assert()
         .success()
         .stdout(predicate::str::contains("23"));
@@ -71,7 +71,7 @@ fn sum_explicit_hex() -> TestResult {
     hello 0xB foo
     ";
     cmd.write_stdin(input)
-        .args(["-f", "2", "-x"])
+        .args(["-f2", "-x"])
         .assert()
         .success()
         .stdout(predicate::str::contains("0x21")); // 33 in decimal
@@ -107,5 +107,38 @@ fn sum_first_delimiter() -> TestResult {
         .assert()
         .success()
         .stdout(predicate::str::contains("6")); // 33 in decimal
+    Ok(())
+}
+
+#[test]
+fn sum_mixed_column() -> TestResult {
+    let mut cmd = Command::cargo_bin("sumcol")?;
+    let input = r"
+    hello 2 foo
+    hello OOPS foo
+    hello 2 foo
+    ";
+    cmd.write_stdin(input)
+        .args(["-f=2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("4"));
+    Ok(())
+}
+
+#[test]
+fn sum_mixed_column_looks_like_number() -> TestResult {
+    let mut cmd = Command::cargo_bin("sumcol")?;
+    let input = r"
+    hello 2 foo
+    hello a foo
+    hello 2 foo
+    ";
+    cmd.write_stdin(input)
+        .args(["-f=2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("4"))
+        .stderr(predicate::str::contains("Consider using"));
     Ok(())
 }
