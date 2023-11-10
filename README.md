@@ -65,16 +65,16 @@ the file listing from above, we could do the following:
 
 ```console
 $ ls -l | awk '{print $5}' | sumcol 
-17592
+17469
 ```
 
 ### Summing hex numbers
 
-Programmers are often dealign with numbers written in hex. Typically in forms
-like `0x123abc` or even simply `0000abcd`. When `sumcol` seems a number
-starting with `0x` it always assumes it's written in hex and parses it
-accordingly. However, a hex number written without that prefix requires that we
-tell sumcol to use hex.
+Programmers are often dealing with numbers written in hex. Typically in forms
+like `0x123abc` or even simply `0000abcd`. When `sumcol` sees a number starting
+with `0x` it always assumes it's written in hex and parses it accordingly.
+However, a hex number written without that prefix requires that we tell sumcol
+to use hex.
 
 For this example we'll sum the sizes of each section in the compiled `sumcol`
 binary. We can see this information with the `objdump` command.
@@ -155,7 +155,8 @@ LOAD,
 ```
 
 Yuck. That has numbers, and non-numbers. Luckily, `sumcol` will easily handle
-this! It quietly ignores non-numbes treating them as if they're a `0`. So let's see what answer we get:
+this! It quietly ignores non-numbers treating them as if they're a `0`. So
+let's see what answer we get:
 
 ```console
 $ objdump -h target/release/sumcol | sumcol -f3
