@@ -16,9 +16,11 @@ USER $USERNAME
 # Install Rust
 ENV SHELL /bin/bash
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-RUN . $HOME/.cargo/env && cargo install ripgrep fd-find
+RUN . $HOME/.cargo/env && cargo install cargo-quickinstall
+RUN . $HOME/.cargo/env && cargo quickinstall ripgrep fd-find
 
 # Install Homebrew
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 RUN eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+RUN echo "eval \"\$($(brew --prefix)/bin/brew shellenv)\"" >> ~/.bashrc
 RUN NONINTERACTIVE=1 brew install neovim fish
