@@ -21,6 +21,5 @@ RUN . $HOME/.cargo/env && cargo quickinstall ripgrep fd-find
 
 # Install Homebrew
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-RUN eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-RUN echo "eval \"\$($(brew --prefix)/bin/brew shellenv)\"" >> ~/.bashrc
-RUN NONINTERACTIVE=1 brew install neovim fish
+RUN NONINTERACTIVE=1 /home/linuxbrew/.linuxbrew/bin/brew install neovim fish
+RUN echo "eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"" >> ~/.bashrc
