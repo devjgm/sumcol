@@ -3,9 +3,6 @@ ARG USERNAME=sumcol
 
 RUN apt update -y && apt upgrade -y && apt install -y \
     build-essential \
-    zsh \
-    fish \
-    neovim \
     sudo \
     curl \
     git \
@@ -20,3 +17,8 @@ USER $USERNAME
 ENV SHELL /bin/bash
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 RUN . $HOME/.cargo/env && cargo install ripgrep fd-find
+
+# Install Homebrew
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+RUN eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+RUN NONINTERACTIVE=1 brew install neovim fish
