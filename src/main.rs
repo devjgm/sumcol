@@ -3,6 +3,7 @@ use env_logger::Env;
 use regex::Regex;
 use std::fs;
 use std::io::{self, BufRead, BufReader};
+use sumcol::Sum;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -41,7 +42,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         v
     };
 
-    let mut sum = 0i128;
+    let mut sum = Sum::Integer(0);
     for reader in readers {
         for (i, line) in reader.lines().enumerate() {
             let line = line?.trim().to_string();
@@ -59,17 +60,26 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 None => (col, default_radix),
             };
             let n = match i128::from_str_radix(col, radix) {
-                Ok(n) => n,
+                Ok(n) => Sum::Integer(n),
                 Err(e) => {
-                    log::info!("{e:?}, col={col:?}. Using 0 instead.");
-                    // If it parses as hex, warn the user that they may want to use -x.
-                    if i128::from_str_radix(col, 16).is_ok() {
-                        log::warn!("Failed to parse {col:?}. Consider using -x");
+                    log::info!("Not integer. {e:?}, col={col:?}, radix={radix:?}.");
+                    // Try parsing as a float
+                    match col.parse::<f64>() {
+                        Ok(n) => Sum::Float(n),
+                        Err(e) => {
+                            log::info!("Not float. {e:?}, col={col:?}.");
+                            // If it parses as hex, warn the user that they may want to use -x.
+                            if i128::from_str_radix(col, 16).is_ok() {
+                                log::warn!(
+                                    "Failed to parse {col:?}, but it may be hex. Consider using -x"
+                                );
+                            }
+                            Sum::Integer(0)
+                        }
                     }
-                    0
                 }
             };
-            sum += n;
+            sum = sum + n;
             log::debug!("{i}: col={col:?}, n={n:?}, sum={sum:?}");
         }
     }

@@ -1,37 +1,44 @@
+use std::fmt;
+use std::ops::Add;
+
 /// This enum represents the sum of a sequence of numbers that may be integers or floating point.
 /// Integer is the default. When a floating point number is added to the sum, the type is converted
 /// to Float.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Sum {
     Integer(i128),
     Float(f64),
 }
 
-impl Sum {
-    fn new() -> Self {
-        Self::Integer(0)
-    }
+impl Add for Sum {
+    type Output = Self;
 
-    /// Adds `n` to the sum. The type (Integer or Float) of the Sum is unchanged.
-    fn add_integer(&mut self, n: i128) {
-        *self = match *self {
-            Sum::Integer(i) => Sum::Integer(i + n),
-            Sum::Float(f) => Sum::Float(f + n as f64),
-        };
-    }
-
-    /// Adds `n` to the sum. If the type is Intger, it's changed to Float after this operation.
-    fn add_float(&mut self, n: f64) {
-        *self = match *self {
-            Sum::Integer(i) => Sum::Float(i as f64 + n),
-            Sum::Float(f) => Sum::Float(f + n),
-        };
+    /// Adds two Sums. If either is a Float, the result will be a Float.
+    fn add(self, other: Self) -> Self {
+        match (self, other) {
+            (Sum::Integer(a), Sum::Integer(b)) => Sum::Integer(a + b),
+            (Sum::Float(a), Sum::Float(b)) => Sum::Float(a + b),
+            (Sum::Integer(a), Sum::Float(b)) => Sum::Float(a as f64 + b),
+            (Sum::Float(a), Sum::Integer(b)) => Sum::Float(a + b as f64),
+        }
     }
 }
 
-impl Default for Sum {
-    fn default() -> Self {
-        Self::new()
+impl fmt::Display for Sum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Sum::Integer(n) => write!(f, "{n}"),
+            Sum::Float(n) => write!(f, "{n}"),
+        }
+    }
+}
+
+impl fmt::UpperHex for Sum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Sum::Integer(n) => fmt::UpperHex::fmt(n, f),
+            Sum::Float(n) => fmt::Display::fmt(n, f),
+        }
     }
 }
 
@@ -40,30 +47,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_works() {
-        assert_eq!(Sum::new(), Default::default());
+    fn sum_integer_works() {
+        let a = Sum::Integer(1);
+        let b = Sum::Integer(2);
+        assert_eq!(a + b, Sum::Integer(3));
     }
 
     #[test]
-    fn integer_sum_works() {
-        let mut sum = Sum::Integer(0);
-        assert_eq!(sum, Sum::Integer(0));
-        sum.add_integer(2);
-        assert_eq!(sum, Sum::Integer(2));
+    fn sum_float_works() {
+        let a = Sum::Float(0.2);
+        let b = Sum::Float(0.8);
+        assert_eq!(a + b, Sum::Float(1.0));
     }
 
     #[test]
-    fn float_sum_works() {
-        let mut sum = Sum::Float(1.2);
-        assert_eq!(sum, Sum::Float(1.2));
-        sum.add_float(0.7);
-        assert_eq!(sum, Sum::Float(1.9));
-    }
-
-    #[test]
-    fn mixed_sum_works() {
-        let mut sum = Sum::Integer(1);
-        sum.add_float(0.2);
-        assert_eq!(sum, Sum::Float(1.2));
+    fn sum_mixed_works() {
+        let a = Sum::Integer(1);
+        let b = Sum::Float(0.2);
+        assert_eq!(a + b, Sum::Float(1.2));
+        assert_eq!(b + a, Sum::Float(1.2));
     }
 }
