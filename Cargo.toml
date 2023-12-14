@@ -1,12 +1,13 @@
 [package]
 name = "sumcol"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A command-line tool to sum a column of numbers."
 keywords = ["sum", "column"]
 categories = ["command-line-utilities"]
 repository = "https://github.com/devjgm/sumcol"
+documentation = "https://docs.rs/crate/sumcol/latest"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
