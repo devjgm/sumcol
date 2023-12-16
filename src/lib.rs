@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::Add;
+use std::ops::{Add, AddAssign};
 
 /// This enum represents the sum of a sequence of numbers that may be integers or floating point.
 /// Integer is the default. When a floating point number is added to the sum, the type is converted
@@ -21,6 +21,13 @@ impl Add for Sum {
             (Sum::Integer(a), Sum::Float(b)) => Sum::Float(a as f64 + b),
             (Sum::Float(a), Sum::Integer(b)) => Sum::Float(a + b as f64),
         }
+    }
+}
+
+impl AddAssign for Sum {
+    /// Adds two Sums. If either is a Float, the result will be a Float.
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
     }
 }
 
@@ -51,6 +58,10 @@ mod tests {
         let a = Sum::Integer(1);
         let b = Sum::Integer(2);
         assert_eq!(a + b, Sum::Integer(3));
+
+        let mut c = a;
+        c += b;
+        assert_eq!(c, Sum::Integer(3));
     }
 
     #[test]

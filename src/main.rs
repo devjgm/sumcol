@@ -79,7 +79,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             };
-            sum = sum + n;
+            sum += n;
             log::debug!("{i}: col={col:?}, n={n:?}, sum={sum:?}");
         }
     }
