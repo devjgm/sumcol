@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use env_logger::Env;
 use regex::Regex;
 use std::fs;
@@ -20,9 +21,21 @@ struct Args {
     #[arg(long, short, default_value(r"\s+"))]
     delimiter: Regex,
 
+    /// Print each number that's being summed, along with some metadata
+    #[arg(long, short = 'v')]
+    verbose: bool,
+
     /// Files to read input from, otherwise uses stdin.
     #[arg(trailing_var_arg = true)]
     pub files: Vec<String>,
+}
+
+fn fmt_sum(sum: Sum, is_hex: bool) -> String {
+    if is_hex {
+        format!("{sum:#X}")
+    } else {
+        format!("{sum}")
+    }
 }
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -43,6 +56,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut sum = Sum::Integer(0);
+    let mut cnt = 0; // Count of numbers we parse successfully.
     for reader in readers {
         for (i, line) in reader.lines().enumerate() {
             let line = line?.trim().to_string();
@@ -50,44 +64,71 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             if line.is_empty() {
                 continue;
             }
-            let col = match args.field {
+            let raw_str = match args.field {
                 0 => line.as_str(),
                 f => args.delimiter.split(&line).nth(f - 1).unwrap_or_default(),
             };
-            let default_radix = if args.hex { 16 } else { 10 };
-            let (col, radix) = match col.strip_prefix("0x") {
+            // Trim and remove commas. This may break localized numbers.
+            let clean_str = raw_str.trim().replace(',', "");
+            let (clean_str, radix) = match clean_str.strip_prefix("0x") {
                 Some(s) => (s, 16),
-                None => (col, default_radix),
+                None => (&clean_str as &str, if args.hex { 16 } else { 10 }),
             };
-            let n = match i128::from_str_radix(col, radix) {
-                Ok(n) => Sum::Integer(n),
+            // Holds an optional error string from parsing that we may display in verbose output.
+            let mut err = None;
+            let n = match i128::from_str_radix(clean_str, radix) {
+                Ok(n) => {
+                    cnt += 1;
+                    Sum::Integer(n)
+                }
                 Err(e) => {
-                    log::info!("Not integer. {e:?}, col={col:?}, radix={radix:?}.");
+                    log::info!("Not integer. {e:?}, clean={clean_str:?}, radix={radix:?}.");
                     // Try parsing as a float
-                    match col.parse::<f64>() {
-                        Ok(n) => Sum::Float(n),
+                    match clean_str.parse::<f64>() {
+                        Ok(n) => {
+                            cnt += 1;
+                            Sum::Float(n)
+                        }
                         Err(e) => {
-                            log::info!("Not float. {e:?}, col={col:?}.");
+                            log::info!("Not float. {e:?}, clean={clean_str:?}.");
                             // If it parses as hex, warn the user that they may want to use -x.
-                            if i128::from_str_radix(col, 16).is_ok() {
+                            if i128::from_str_radix(clean_str, 16).is_ok() {
                                 log::warn!(
-                                    "Failed to parse {col:?}, but it may be hex. Consider using -x"
+                                    "Failed to parse {clean_str:?}, but it may be hex. Consider using -x"
                                 );
                             }
+                            err = Some(format!("{e:?}"));
                             Sum::Integer(0)
                         }
                     }
                 }
             };
             sum += n;
-            log::debug!("{i}: col={col:?}, n={n:?}, sum={sum:?}");
+            if args.verbose {
+                // Print each number that we're summing, along with some metadata.
+                let mut metadata = vec![];
+                metadata.push(format!("n={}", format!("{:?}", n).bold()).cyan());
+                metadata.push(format!("sum={}", format!("{:?}", sum).bold()).cyan());
+                metadata.push(format!("cnt={}", format!("{cnt}").bold()).cyan());
+                metadata.push(format!("radix={}", format!("{radix}").bold()).cyan());
+                metadata.push(format!("raw_str={}", format!("{raw_str:?}").bold()).cyan());
+                if let Some(err) = err {
+                    metadata.push(format!("err={}", format!("{err:?}").bold()).red());
+                }
+                print!("{}\t", fmt_sum(n, args.hex));
+                ["#".cyan()]
+                    .into_iter()
+                    .chain(metadata.into_iter())
+                    .for_each(|x| print!(" {}", x));
+                println!();
+            }
         }
     }
 
-    if args.hex {
-        println!("{sum:#X}");
-    } else {
-        println!("{sum}");
+    if args.verbose {
+        println!("{}", "==".cyan());
     }
+    println!("{}", fmt_sum(sum, args.hex));
+
     Ok(())
 }

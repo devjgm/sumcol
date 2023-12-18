@@ -210,3 +210,35 @@ fn sum_float_hex_flag() -> TestResult {
         .stdout(predicate::str::contains("15.2"));
     Ok(())
 }
+
+#[test]
+fn sum_verbose_flag() -> TestResult {
+    let mut cmd = Command::cargo_bin("sumcol")?;
+    let input = r"
+    hello 2 blah
+    hello OOPS blah
+    hello 1.0 foo
+    hello 2.2 oo
+    ";
+
+    // Without the -x flag, the A in the second line will be ignored.
+    cmd.write_stdin(input)
+        .args(["-f=2", "-v"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            r#"n=Integer(2) sum=Integer(2) cnt=1 radix=10 raw_str="2""#,
+        ))
+        .stdout(predicate::str::contains(
+            r#"n=Integer(0) sum=Integer(2) cnt=1 radix=10 raw_str="OOPS" err="ParseFloatError { kind: Invalid }""#,
+        ))
+        .stdout(predicate::str::contains(
+            r#"n=Float(2.2) sum=Float(5.2) cnt=3 radix=10 raw_str="2.2""#
+        ))
+        .stdout(predicate::str::contains(
+            r#"=="#))
+        .stdout(predicate::str::contains(
+            r#"5.2"#
+        ));
+    Ok(())
+}

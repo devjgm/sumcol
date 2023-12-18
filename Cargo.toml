@@ -13,6 +13,7 @@ documentation = "https://docs.rs/crate/sumcol/latest"
 
 [dependencies]
 clap = { version = "4.4.7", features = ["derive"] }
+colored = "2.1.0"
 env_logger = "0.10.1"
 log = "0.4.20"
 regex = "1.10.2"

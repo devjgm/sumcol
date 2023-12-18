@@ -34,6 +34,7 @@ Options:
   -f, --field <FIELD>          The field to sum. If not specified, uses the full line [default: 0]
   -x, --hex                    Treat all numbers as hex, not just those with a leading 0x
   -d, --delimiter <DELIMITER>  The regex on which to split fields [default: \s+]
+  -v, --verbose                Print each number that's being summed, along with some metadata
   -h, --help                   Print help
   -V, --version                Print version
 ```
@@ -191,31 +192,30 @@ silently parsed them correctly and omitted the warning.
 ## Debugging
 
 If `sumcol` doesn't seem to be working right, feel free to look at the code on
-github (it's pretty straight forward), or run it with the `RUST_LOG=debug`
-environment variable set. For example:
+github (it's pretty straight forward), or run it with the `-v` or `--verbose`
+flag, or even enable the `RUST_LOG=debug` environment variable set. For
+example:
 
-```console
-$ ls -l /etc/ | sumcol -f3
-0
+```console:
+$ printf "1\n2.5\nOOPS\n3" | sumcol -v
+1       # n=Integer(1) sum=Integer(1) cnt=1 radix=10 raw_str="1"
+2.5     # n=Float(2.5) sum=Float(3.5) cnt=2 radix=10 raw_str="2.5"
+0       # n=Integer(0) sum=Float(3.5) cnt=2 radix=10 raw_str="OOPS" err="ParseFloatError { kind: Invalid }"
+3       # n=Integer(3) sum=Float(6.5) cnt=3 radix=10 raw_str="3"
+==
+6.5
 ```
-Zero? Hmm. That's weird. Let's debug.
 
-```console
-$ ls -l /etc/ | RUST_LOG=debug sumcol -f3
-[2023-11-10T21:13:46Z DEBUG sumcol] args=Args { field: 3, hex: false, delimiter: Regex("\\s+"), files: [] }
-[2023-11-10T21:13:46Z DEBUG sumcol] 0: line="total 840"
-[2023-11-10T21:13:46Z INFO  sumcol] ParseIntError { kind: Empty }, col="". Using 0 instead.
-[2023-11-10T21:13:46Z DEBUG sumcol] 0: col="", n=0, sum=0
-[2023-11-10T21:13:46Z DEBUG sumcol] 1: line="-rw-r--r--   1 root  wheel     515 Sep 16 09:28 afpovertcp.cfg"
-[2023-11-10T21:13:46Z INFO  sumcol] ParseIntError { kind: InvalidDigit }, col="root". Using 0 instead.
-[2023-11-10T21:13:46Z DEBUG sumcol] 1: col="root", n=0, sum=0
-[2023-11-10T21:13:46Z DEBUG sumcol] 2: line="lrwxr-xr-x   1 root  wheel      15 Sep 16 09:28 aliases -> postfix/aliases"
-[2023-11-10T21:13:46Z INFO  sumcol] ParseIntError { kind: InvalidDigit }, col="root". Using 0 instead.
-[2023-11-10T21:13:46Z DEBUG sumcol] 2: col="root", n=0, sum=0
-[2023-11-10T21:13:46Z DEBUG sumcol] 3: line="-rw-r-----   1 root  wheel   16384 Sep 16 09:28 aliases.db"
-[2023-11-10T21:13:46Z INFO  sumcol] ParseIntError { kind: InvalidDigit }, col="root". Using 0 instead.
-...
-```
-And we can see here that it's trying to parse things like `col="root"` as a
-number, which doesn't make sense. The problem is that we are trying to sum
-column three (the file owner) rather than column 5 (the file size).
+The metadata that's displayed on each line is
+
+| Name | Description |
+|------|-------------|
+| `n` | The parsed numeric value |
+| `sum` | The running sum up to and including the current `n` |
+| `cnt` | The running count of _successfully_ parsed numbers. If a number fails to parse and 0 is used instead, it will not be included in `cnt` |
+| `radix` | The radix used when trying to parse the number as an integer |
+| `raw_str` | The raw string data that was parsed |
+| `err` | If present, this shows the error from trying to parse the string into a number |
+
+This should be enough to help you debug the problem you're seeing. However, if
+that's not enough, give it a try with `RUST_LOG=debug`.
