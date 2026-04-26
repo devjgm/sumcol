@@ -18,10 +18,10 @@ enum Radix {
 /// Sum a column of numbers from text input.
 ///
 /// Examples:
-///   ls -l | sumcol -f 5
-///   sumcol -f 3 -d : /etc/passwd
+///   ls -l | sumcol -f5
+///
 #[derive(Parser, Debug)]
-#[command(version, about)]
+#[command(version, verbatim_doc_comment)]
 struct Args {
     /// The field to sum. If not specified, uses the full line.
     #[arg(long, short, default_value("0"))]
