@@ -16,7 +16,9 @@ impl Add for Sum {
     /// Adds two Sums. If either is a Float, the result will be a Float.
     fn add(self, other: Self) -> Self {
         match (self, other) {
-            (Sum::Integer(a), Sum::Integer(b)) => Sum::Integer(a + b),
+            (Sum::Integer(a), Sum::Integer(b)) => {
+                Sum::Integer(a.checked_add(b).expect("integer overflow"))
+            }
             (Sum::Float(a), Sum::Float(b)) => Sum::Float(a + b),
             (Sum::Integer(a), Sum::Float(b)) => Sum::Float(a as f64 + b),
             (Sum::Float(a), Sum::Integer(b)) => Sum::Float(a + b as f64),
@@ -77,5 +79,23 @@ mod tests {
         let b = Sum::Float(0.2);
         assert_eq!(a + b, Sum::Float(1.2));
         assert_eq!(b + a, Sum::Float(1.2));
+    }
+
+    #[test]
+    fn sum_mixed_add_assign_works() {
+        let mut a = Sum::Integer(1);
+        a += Sum::Float(0.2);
+        assert_eq!(a, Sum::Float(1.2));
+
+        let mut b = Sum::Float(0.2);
+        b += Sum::Integer(1);
+        assert_eq!(b, Sum::Float(1.2));
+    }
+
+    #[test]
+    #[should_panic]
+    fn sum_integer_overflow_panics() {
+        let mut a = Sum::Integer(i128::MAX);
+        a += Sum::Integer(1);
     }
 }

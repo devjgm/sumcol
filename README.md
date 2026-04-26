@@ -6,11 +6,13 @@
 `sumcol` is a simple unix-style command-line tool for summing numbers from a
 column of text. It's a replacement for the tried and true Unix-isms, like `awk
 '{s += $3} END {print s}'` (prints the sum of the numbers in the third
-whitespace delimited column), without all the verbosity.
+whitespace delimited column), without all the verbosity. `sumcol` tries to be
+smart and interpret hex, float, and decimal values automatically, though you
+can force the radix with the `--radix` flag.
 
 ## Quick Install
 ```console
-$ cargo install sumcol
+$ cargo install --locked sumcol
 ```
 
 ## Examples
@@ -32,10 +34,10 @@ Arguments:
 
 Options:
   -f, --field <FIELD>          The field to sum. If not specified, uses the full line [default: 0]
-  -x, --hex                    Treat all numbers as hex, not just those with a leading 0x
+      --radix <RADIX>          How to interpret numeric input [default: auto] [possible values: auto, hex, decimal]
   -d, --delimiter <DELIMITER>  The regex on which to split fields [default: \s+]
   -v, --verbose                Print each number that's being summed, along with some metadata
-  -h, --help                   Print help
+  -h, --help                   Print help (see more with '--help')
   -V, --version                Print version
 ```
 
@@ -56,9 +58,12 @@ The size is shown in column -- or field -- number 5 (starting from 1), so we can
 
 ```console
 $ ls -l | sumcol -f5
+ WARN sumcol: Field index out of range, skipping field=5 line="total 48"
 17469
 ```
-Which is equivalent to (but shorter than) the classic awk incantation:
+The warning is from the `total 48` summary line which doesn't have a fifth
+field; it's safely skipped and the sum is still correct. Equivalent to (but
+shorter than) the classic awk incantation:
 ```console
 $ ls -l | awk '{s += $5} END {print s}'
 17469
@@ -66,7 +71,7 @@ $ ls -l | awk '{s += $5} END {print s}'
 
 ### Sum all input
 
-Sometimes you use other tools to extact a column of numbers, in which case you
+Sometimes you use other tools to extract a column of numbers, in which case you
 can still use sumcol with no arguments to simply sum all of the input. Using
 the file listing from above, we could do the following:
 
@@ -78,10 +83,10 @@ $ ls -l | awk '{print $5}' | sumcol
 ### Summing hex numbers
 
 Programmers are often dealing with numbers written in hex. Typically in forms
-like `0x123abc` or even simply `0000abcd`. When `sumcol` sees a number starting
-with `0x` it always assumes it's written in hex and parses it accordingly.
-However, a hex number written without that prefix requires that we tell sumcol
-to use hex.
+like `0x123abc` or even simply `0000abcd`. By default, when `sumcol` sees a
+number starting with `0x` it assumes it's written in hex and parses it
+accordingly. However, a hex number written without that prefix requires that we
+tell sumcol to use hex via `--radix=hex`.
 
 For this example we'll sum the sizes of each section in the compiled `sumcol`
 binary. We can see this information with the `objdump` command.
@@ -161,47 +166,40 @@ LOAD,
 00000148
 ```
 
-Yuck. That has numbers, and non-numbers. Luckily, `sumcol` will easily handle
-this! It quietly ignores non-numbers treating them as if they're a `0`. So
-let's see what answer we get:
+Yuck. That has numbers, and non-numbers. The numeric values are hex without a
+`0x` prefix, so we need to pass `--radix=hex` to tell `sumcol` to parse them as
+hex. Non-numeric tokens (table headers, comma-separated description tags) will
+emit warnings and be treated as `0`:
 
 ```console
-$ objdump -h target/release/sumcol | sumcol -f3
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "0014c350". Consider using -x
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "000003b4". Consider using -x
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "0004f458". Consider using -x
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "0000cae8". Consider using -x
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "000087c8". Consider using -x
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "0002e5e0". Consider using -x
-[2023-11-10T21:02:06Z WARN  sumcol] Failed to parse "0002c9c0". Consider using -x
-732
-```
-
-Interesting. Sumcol quietly ignores non-numbers like `LOAD` in the above
-example, but here it's warning us that it's seeing strings that _look like_ hex
-numbers but we didn't tell it to parse the numbers as hex. Let's try again
-following the recommendation to use `-x`.
-
-```console
-$ objdump -h target/release/sumcol | sumcol -f3 -x
+$ objdump -h target/release/sumcol | sumcol -f3 --radix=hex
+ WARN sumcol: Failed to parse as hex, treating as 0 clean_str="format"
+ WARN sumcol: Field index out of range, skipping field=3 line="Sections:"
+ WARN sumcol: Failed to parse as hex, treating as 0 clean_str="Size"
+ WARN sumcol: Stripped commas from value original="LOAD," clean="LOAD"
+ WARN sumcol: Failed to parse as hex, treating as 0 clean_str="LOAD"
+ ... (similar warnings for each header and description line) ...
 0x20C3AC
 ```
-NOTE: If the hex numbers started with a leading `'0x`, `sumcol` would have
-silently parsed them correctly and omitted the warning.
+
+The warnings here are expected and benign -- `format`, `Size`, `LOAD,`, etc. are
+not hex values and contribute `0` to the sum, so the final answer is correct.
+
+If the values had been written with a `0x` prefix, `sumcol` would have
+auto-detected them as hex with no flag needed.
 
 ## Debugging
 
 If `sumcol` doesn't seem to be working right, feel free to look at the code on
 github (it's pretty straight forward), or run it with the `-v` or `--verbose`
-flag, or even enable the `RUST_LOG=debug` environment variable set. For
-example:
+flag, or run with the `RUST_LOG=debug` environment variable set. For example:
 
-```console:
+```console
 $ printf "1\n2.5\nOOPS\n3" | sumcol -v
-1       # n=Integer(1) sum=Integer(1) cnt=1 radix=10 raw_str="1"
-2.5     # n=Float(2.5) sum=Float(3.5) cnt=2 radix=10 raw_str="2.5"
-0       # n=Integer(0) sum=Float(3.5) cnt=2 radix=10 raw_str="OOPS" err="ParseFloatError { kind: Invalid }"
-3       # n=Integer(3) sum=Float(6.5) cnt=3 radix=10 raw_str="3"
+1       # n=Integer(1) sum=Integer(1) radix=Decimal raw_str="1"
+2.5     # n=Float(2.5) sum=Float(3.5) radix=Decimal raw_str="2.5"
+0       # n=Integer(0) sum=Float(3.5) radix=Decimal raw_str="OOPS" err="Failed to parse (use --radix=hex if hex), treating as 0"
+3       # n=Integer(3) sum=Float(6.5) radix=Decimal raw_str="3"
 ==
 6.5
 ```
@@ -212,10 +210,9 @@ The metadata that's displayed on each line is
 |------|-------------|
 | `n` | The parsed numeric value |
 | `sum` | The running sum up to and including the current `n` |
-| `cnt` | The running count of _successfully_ parsed numbers. If a number fails to parse and 0 is used instead, it will not be included in `cnt` |
-| `radix` | The radix used when trying to parse the number as an integer |
+| `radix` | The effective radix used when parsing the value (`Hex` or `Decimal`) |
 | `raw_str` | The raw string data that was parsed |
-| `err` | If present, this shows the error from trying to parse the string into a number |
+| `err` | If present, the warning message from a failed parse |
 
 This should be enough to help you debug the problem you're seeing. However, if
 that's not enough, give it a try with `RUST_LOG=debug`.
